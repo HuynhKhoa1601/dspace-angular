@@ -1,5 +1,5 @@
 import { ChangeDetectorRef, Component, Inject, ViewChild } from '@angular/core';
-import { DynamicFormControlEvent, DynamicFormControlModel } from '@ng-dynamic-forms/core';
+import { DynamicFormControlEvent, DynamicFormControlModel, parseReviver } from '@ng-dynamic-forms/core';
 
 import { combineLatest as observableCombineLatest, Observable, Subscription } from 'rxjs';
 import { distinctUntilChanged, filter, find, map, mergeMap, take, tap } from 'rxjs/operators';
@@ -11,7 +11,7 @@ import { FormComponent } from '../../../shared/form/form.component';
 import { FormService } from '../../../shared/form/form.service';
 import { SectionModelComponent } from '../models/section.model';
 import { SubmissionFormsConfigService } from '../../../core/config/submission-forms-config.service';
-import { hasValue, isEmpty, isNotEmpty, isUndefined } from '../../../shared/empty.util';
+import { hasValue, isEmpty, isNotEmpty, isNotNull, isUndefined } from '../../../shared/empty.util';
 import { JsonPatchOperationPathCombiner } from '../../../core/json-patch/builder/json-patch-operation-path-combiner';
 import { SubmissionFormsModel } from '../../../core/config/models/config-submission-forms.model';
 import { SubmissionSectionError, SubmissionSectionObject } from '../../objects/submission-objects.reducer';
@@ -34,6 +34,10 @@ import { followLink } from '../../../shared/utils/follow-link-config.model';
 import { environment } from '../../../../environments/environment';
 import { ConfigObject } from '../../../core/config/models/config.model';
 import { RemoteData } from '../../../core/data/remote-data';
+import { RowParser } from '../../../shared/form/builder/parsers/row-parser';
+import { cloneDeep } from 'lodash';
+import { DynamicRowArrayModel } from '../../../shared/form/builder/ds-dynamic-form-ui/models/ds-dynamic-row-array-model';
+import { DynamicRowGroupModel } from '../../../shared/form/builder/ds-dynamic-form-ui/models/ds-dynamic-row-group-model';
 
 /**
  * This component represents a section that contains a Form.
@@ -112,6 +116,13 @@ export class SubmissionSectionFormComponent extends SectionModelComponent {
    */
   protected subs: Subscription[] = [];
 
+  /**
+   * Some input fields are not rendered because actual submission type doesn't equals to type-bind definition.
+   * Save index of every field that is not rendered but is removed from the form.
+   * @type {Array}
+   */
+  protected removedRowsIndex: number[] = [];
+
   protected workspaceItem: WorkspaceItem;
   /**
    * The FormComponent reference
@@ -149,6 +160,7 @@ export class SubmissionSectionFormComponent extends SectionModelComponent {
               protected submissionObjectService: SubmissionObjectDataService,
               protected objectCache: ObjectCacheService,
               protected requestService: RequestService,
+              protected rowParser: RowParser,
               @Inject('collectionIdProvider') public injectedCollectionId: string,
               @Inject('sectionDataProvider') public injectedSectionData: SectionDataObject,
               @Inject('submissionIdProvider') public injectedSubmissionId: string) {
@@ -351,6 +363,103 @@ export class SubmissionSectionFormComponent extends SectionModelComponent {
   }
 
   /**
+   * Copy actual form with filled values and remove all fields with the type-bind property.
+   * @param formConfig configuration of the form, it is loaded from the server.
+   */
+  initFormWithValues(formConfig) {
+    formConfig.rows.forEach((currentRow, indexRow) => {
+      currentRow.fields.forEach((field, indexField) => {
+        /**
+         * Remove a field with the type-bind
+         */
+        if (isNotEmpty(field.typeBind)) {
+          currentRow = this.formBuilderService.removeFieldFromRow(currentRow, indexField);
+          const parsedRow = this.formBuilderService.parseFormRow(this.submissionId, currentRow, this.collectionId,
+            this.sectionData.data, this.submissionService.getSubmissionScope());
+          const oldFormModel = cloneDeep(this.formModel);
+          this.isUpdating = true;
+          this.formModel = null;
+          this.cdr.detectChanges();
+          this.formModel = oldFormModel;
+
+          if (isNotNull(parsedRow)) {
+            this.formModel[indexRow] = parsedRow;
+          } else if (this.isTypeBindFieldRendered(indexRow, indexField, formConfig.rows[indexRow].fields[indexField])) {
+            /**
+             * All fields from row was removed -> remove empty row
+             */
+            this.formModel.splice(indexRow, 1);
+            this.removedRowsIndex.push(indexRow);
+          }
+          this.isUpdating = false;
+          this.cdr.detectChanges();
+        }
+      });
+    });
+  }
+
+  /**
+   * Check if a row with type-bind from the formConfig is rendered in the Submission UI
+   * @param indexRow of the row from the formConfig
+   * @param indexField of the field of the row from the formConfig
+   * @param currentRow row from the formConfig with the only one type-bind field
+   */
+  isTypeBindFieldRendered(indexRow, indexField, currentRow) {
+    let group = null;
+    if (isNotNull(this.formModel[indexRow])) {
+      if (this.formModel[indexRow] instanceof DynamicRowArrayModel) {
+        // @ts-ignore
+        group = this.formModel[indexRow].groups;
+      } else if (this.formModel[indexRow] instanceof DynamicRowGroupModel) {
+        // @ts-ignore
+        group = this.formModel[indexRow].group;
+      }
+    }
+    if (isNotEmpty(currentRow.selectableMetadata) && isNotNull(group)) {
+      if (currentRow.selectableMetadata[0].metadata === group[indexField].name) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Add only fields with the type-bind to the form which type-bind values equals with submission type.
+   * @param event onChange event, if was changed dc.type metadata update the form.
+   * @param formConfig configuration of the form, it is loaded from the server.
+   */
+  updateFormBaseOnTypeBind(event, formConfig) {
+    formConfig.rows.forEach((currentRow, indexRow) => {
+      let isTypeBindInRow = false;
+      currentRow.fields.forEach((field,indexField) => {
+        if (isNotEmpty(field.typeBind)) {
+          isTypeBindInRow = true;
+          if (!field.typeBind.includes(event.$event.value)) {
+            currentRow = this.formBuilderService.removeFieldFromRow(currentRow, indexField);
+          }
+        }
+      });
+      if (isTypeBindInRow) {
+        const parsedRow = this.formBuilderService.parseFormRow(this.submissionId, currentRow, this.collectionId, this.sectionData.data, this.submissionService.getSubmissionScope());
+        const oldFormModel = cloneDeep(this.formModel);
+        this.isUpdating = true;
+        this.formModel = null;
+        this.cdr.detectChanges();
+        this.formModel = oldFormModel;
+        if (isNotNull(parsedRow)) {
+          if (this.removedRowsIndex.includes(indexRow)) {
+            this.formModel.splice(indexRow, 0, parsedRow);
+          } else {
+            this.formModel[indexRow] = parsedRow;
+          }
+        }
+        this.isUpdating = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  /**
    * Method called when a form dfChange event is fired.
    * Dispatch form operations based on changes.
    *
@@ -358,6 +467,11 @@ export class SubmissionSectionFormComponent extends SectionModelComponent {
    *    the [[DynamicFormControlEvent]] emitted
    */
   onChange(event: DynamicFormControlEvent): void {
+    if (event.model.name === 'dc.type') {
+      const rawData = typeof this.formConfig === 'string' ? JSON.parse(this.formConfig, parseReviver) : this.formConfig;
+      this.initFormWithValues(rawData);
+      this.updateFormBaseOnTypeBind(event, rawData);
+    }
     this.formOperationsService.dispatchOperationsFromEvent(
       this.pathCombiner,
       event,

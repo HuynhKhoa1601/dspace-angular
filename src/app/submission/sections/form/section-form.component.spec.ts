@@ -45,6 +45,7 @@ import { ObjectCacheService } from '../../../core/cache/object-cache.service';
 import { RequestService } from '../../../core/data/request.service';
 import { createSuccessfulRemoteDataObject$ } from '../../../shared/remote-data.utils';
 import { cold } from 'jasmine-marbles';
+import { cloneDeep } from 'lodash';
 
 function getMockSubmissionFormsConfigService(): SubmissionFormsConfigService {
   return jasmine.createSpyObj('FormOperationsService', {
@@ -80,6 +81,7 @@ const testFormConfiguration = {
           mandatory: 'true',
           repeatable: false,
           hints: ' Enter Title.',
+          typeBind: ['Article'],
           selectableMetadata: [
             {
               metadata: 'dc.title'
@@ -125,7 +127,14 @@ const testFormModel = [
   new DynamicRowGroupModel({
     id: 'df-row-group-config-2',
     group: [new DsDynamicInputModel({ id: 'dc.contributor', metadataFields: [], repeatable: false, submissionId: '1234', hasSelectableMetadata: false })],
-  })
+  }),
+];
+
+const testOnChangeFormModel = [
+  new DynamicRowGroupModel({
+    id: 'df-row-group-config-3',
+    group: [new DsDynamicInputModel({ id: 'dc.type', value: 'Article', metadataFields: [], repeatable: false, submissionId: '1234', hasSelectableMetadata: false })],
+  }),
 ];
 
 const dynamicFormControlEvent: DynamicFormControlEvent = {
@@ -134,6 +143,15 @@ const dynamicFormControlEvent: DynamicFormControlEvent = {
   control: null,
   group: testFormModel[0] as any,
   model: testFormModel[0].group[0],
+  type: DynamicFormControlEventType.Change
+};
+
+const onChangeFormControlEvent: DynamicFormControlEvent = {
+  $event: new Event('change'),
+  context: null,
+  control: null,
+  group: testOnChangeFormModel[0] as any,
+  model: testOnChangeFormModel[0].group[0],
   type: DynamicFormControlEventType.Change
 };
 
@@ -467,6 +485,62 @@ describe('SubmissionSectionFormComponent test suite', () => {
       expect(formOperationsService.getFieldValueFromChangeEvent).toHaveBeenCalledWith(dynamicFormControlEvent);
       expect(submissionServiceStub.dispatchSave).toHaveBeenCalledWith(submissionId);
 
+    });
+
+    describe('test type-bind', () => {
+      beforeEach(() => {
+        formBuilderService.modelFromConfiguration.and.returnValue(testFormModel);
+        const sectionData = {};
+
+        comp.initForm(sectionData);
+      });
+
+      it('should call methods initFormWithValues and updateFormBaseOnTypeBind onChange event', () => {
+        spyOn(comp,'initFormWithValues');
+        spyOn(comp,'updateFormBaseOnTypeBind');
+
+        comp.onChange(onChangeFormControlEvent);
+
+        expect(comp.initFormWithValues).toHaveBeenCalledWith(undefined);
+        expect(comp.updateFormBaseOnTypeBind).toHaveBeenCalledWith(onChangeFormControlEvent, undefined);
+      });
+
+      it('should remove fields with type-bind from the form model by initFormWithValues method', () => {
+        const testFormConfWithoutTypeBind = cloneDeep(testFormConfiguration);
+
+        testFormConfWithoutTypeBind.rows[0].fields.splice(0,1);
+        formBuilderService.removeFieldFromRow.and.returnValue(testFormConfWithoutTypeBind.rows[0]);
+        formBuilderService.parseFormRow.and.returnValue(null);
+
+        comp.initFormWithValues(testFormConfiguration);
+
+        expect(comp.formModel).not.toEqual(testFormModel);
+        expect(comp.formModel.length).toEqual(1);
+        expect(comp.formModel[0].id).toEqual('df-row-group-config-2');
+      });
+
+      it('should add fields with type-bind to the form model by updateFormBaseOnTypeBind method', () => {
+        /**
+         * Remove type-bind fields from the formModel
+         */
+        const testFormConfWithoutTypeBind = cloneDeep(testFormConfiguration);
+        testFormConfWithoutTypeBind.rows[0].fields.splice(0,1);
+        formBuilderService.removeFieldFromRow.and.returnValue(testFormConfWithoutTypeBind.rows[0]);
+        formBuilderService.parseFormRow.and.returnValue(comp.formModel[0]);
+        comp.initFormWithValues(testFormConfiguration);
+
+        /**
+         * Add fields with type-bind to the formModel
+         */
+        formBuilderService.removeFieldFromRow.and.returnValue(testFormConfiguration.rows[0]);
+        onChangeFormControlEvent.$event.value = 'Article';
+
+        comp.updateFormBaseOnTypeBind(onChangeFormControlEvent, testFormConfiguration);
+
+        // expect(comp.formModel).toEqual(testFormModel);
+        expect(comp.formModel.length).toEqual(2);
+        expect(comp.formModel[0].id).toEqual('df-row-group-config-1');
+      });
     });
 
     it('should set previousValue on form focus event', () => {

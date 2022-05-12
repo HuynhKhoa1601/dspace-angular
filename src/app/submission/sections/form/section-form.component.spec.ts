@@ -515,8 +515,7 @@ describe('SubmissionSectionFormComponent test suite', () => {
         comp.initFormWithValues(testFormConfiguration);
 
         expect(comp.formModel).not.toEqual(testFormModel);
-        expect(comp.formModel.length).toEqual(1);
-        expect(comp.formModel[0].id).toEqual('df-row-group-config-2');
+        expect(comp.formModel[0].hidden).toBe(true);
       });
 
       it('should add fields with type-bind to the form model by updateFormBaseOnTypeBind method', () => {

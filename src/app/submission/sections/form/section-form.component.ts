@@ -121,7 +121,7 @@ export class SubmissionSectionFormComponent extends SectionModelComponent {
    * Save index of every field that is not rendered but is removed from the form.
    * @type {Array}
    */
-  protected removedRowsIndex: number[] = [];
+  protected hiddenRowsIndex: number[] = [];
 
   protected workspaceItem: WorkspaceItem;
   /**
@@ -367,35 +367,36 @@ export class SubmissionSectionFormComponent extends SectionModelComponent {
    * @param formConfig configuration of the form, it is loaded from the server.
    */
   initFormWithValues(formConfig) {
+    const updatedFormModel = cloneDeep(this.formModel);
     formConfig.rows.forEach((currentRow, indexRow) => {
       currentRow.fields.forEach((field, indexField) => {
-        /**
-         * Remove a field with the type-bind
-         */
+        // Remove a field or a row with the type-bind
         if (isNotEmpty(field.typeBind)) {
           currentRow = this.formBuilderService.removeFieldFromRow(currentRow, indexField);
           const parsedRow = this.formBuilderService.parseFormRow(this.submissionId, currentRow, this.collectionId,
             this.sectionData.data, this.submissionService.getSubmissionScope());
-          const oldFormModel = cloneDeep(this.formModel);
-          this.isUpdating = true;
-          this.formModel = null;
-          this.cdr.detectChanges();
-          this.formModel = oldFormModel;
-
+          // the row has input field with the type-bind and without type-bind
           if (isNotNull(parsedRow)) {
-            this.formModel[indexRow] = parsedRow;
-          } else if (this.isTypeBindFieldRendered(indexRow, indexField, formConfig.rows[indexRow].fields[indexField])) {
-            /**
-             * All fields from row was removed -> remove empty row
-             */
-            this.formModel.splice(indexRow, 1);
-            this.removedRowsIndex.push(indexRow);
+            // remove type-bind input field from the row where is another non type-bind input field
+            updatedFormModel[indexRow] = parsedRow;
+          } else {
+            // whole row is type-bind, mark it as removed and remove if is rendered
+            if (this.isTypeBindFieldRendered(indexRow, indexField, formConfig.rows[indexRow].fields[indexField])) {
+              // All fields from row was removed -> remove empty row
+              updatedFormModel[indexRow].hidden = true;
+              // updatedFormModel.splice(indexRow, 1);
+              }
+            this.hiddenRowsIndex.push(indexRow);
           }
-          this.isUpdating = false;
-          this.cdr.detectChanges();
         }
       });
     });
+    this.isUpdating = true;
+    this.formModel = null;
+    this.cdr.detectChanges();
+    this.formModel = updatedFormModel;
+    this.isUpdating = false;
+    this.cdr.detectChanges();
   }
 
   /**
@@ -409,14 +410,15 @@ export class SubmissionSectionFormComponent extends SectionModelComponent {
     if (isNotNull(this.formModel[indexRow])) {
       if (this.formModel[indexRow] instanceof DynamicRowArrayModel) {
         // @ts-ignore
-        group = this.formModel[indexRow].groups;
+        group = this.formModel[indexRow].groups[0].group;
       } else if (this.formModel[indexRow] instanceof DynamicRowGroupModel) {
         // @ts-ignore
         group = this.formModel[indexRow].group;
       }
     }
     if (isNotEmpty(currentRow.selectableMetadata) && isNotNull(group)) {
-      if (currentRow.selectableMetadata[0].metadata === group[indexField].name) {
+      if (currentRow.selectableMetadata[0].metadata === group[indexField].name &&
+        this.formModel[indexRow].hidden === false) {
         return true;
       }
     }
@@ -447,11 +449,11 @@ export class SubmissionSectionFormComponent extends SectionModelComponent {
         this.cdr.detectChanges();
         this.formModel = oldFormModel;
         if (isNotNull(parsedRow)) {
-          if (this.removedRowsIndex.includes(indexRow)) {
-            this.formModel.splice(indexRow, 0, parsedRow);
-          } else {
-            this.formModel[indexRow] = parsedRow;
+          // show type-bind row
+          if (this.hiddenRowsIndex.includes(indexRow)) {
+            parsedRow.hidden = false;
           }
+          this.formModel[indexRow] = parsedRow;
         }
         this.isUpdating = false;
         this.cdr.detectChanges();

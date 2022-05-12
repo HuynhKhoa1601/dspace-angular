@@ -507,7 +507,6 @@ describe('FormBuilderService test suite', () => {
   it('should not init all fields to the formModel because one has type-bind.', () => {
     const formModel = service.modelFromConfiguration(submissionId, testFormConfigurationWithTypeBind, 'testScopeUUID');
 
-    expect(formModel.length).toEqual(1);
     // @ts-ignore
     expect(formModel[0].group[0].name).toEqual('dc.contributor');
   });

@@ -366,35 +366,39 @@ export class SubmissionSectionFormComponent extends SectionModelComponent {
    * Copy actual form with filled values and remove all fields with the type-bind property.
    * @param formConfig configuration of the form, it is loaded from the server.
    */
-  initFormWithValues(formConfig) {
-    const updatedFormModel = cloneDeep(this.formModel);
-    formConfig.rows.forEach((currentRow, indexRow) => {
-      currentRow.fields.forEach((field, indexField) => {
-        // Remove a field or a row with the type-bind
-        if (isNotEmpty(field.typeBind)) {
-          currentRow = this.formBuilderService.removeFieldFromRow(currentRow, indexField);
-          const parsedRow = this.formBuilderService.parseFormRow(this.submissionId, currentRow, this.collectionId,
-            this.sectionData.data, this.submissionService.getSubmissionScope());
-          // the row has input field with the type-bind and without type-bind
-          if (isNotNull(parsedRow)) {
-            // remove type-bind input field from the row where is another non type-bind input field
-            updatedFormModel[indexRow] = parsedRow;
-          } else {
-            // whole row is type-bind, mark it as removed and remove if is rendered
-            if (this.isTypeBindFieldRendered(indexRow, indexField, formConfig.rows[indexRow].fields[indexField])) {
-              // All fields from row was removed -> remove empty row
-              updatedFormModel[indexRow].hidden = true;
-              // updatedFormModel.splice(indexRow, 1);
-              }
-            this.hiddenRowsIndex.push(indexRow);
-          }
-        }
-      });
-    });
+  initFormWithValues(typeValue) {
+    // const updatedFormModel = cloneDeep(this.formModel);
+    // formConfig.rows.forEach((currentRow, indexRow) => {
+    //   currentRow.fields.forEach((field, indexField) => {
+    //     // Remove a field or a row with the type-bind
+    //     if (isNotEmpty(field.typeBind)) {
+    //       currentRow = this.formBuilderService.removeFieldFromRow(currentRow, indexField);
+    //       const parsedRow = this.formBuilderService.parseFormRow(this.submissionId, currentRow, this.collectionId,
+    //         this.sectionData.data, this.submissionService.getSubmissionScope());
+    //       // the row has input field with the type-bind and without type-bind
+    //       if (isNotNull(parsedRow)) {
+    //         // remove type-bind input field from the row where is another non type-bind input field
+    //         updatedFormModel[indexRow] = parsedRow;
+    //       } else {
+    //         // whole row is type-bind, mark it as removed and remove if is rendered
+    //         if (this.isTypeBindFieldRendered(indexRow, indexField, formConfig.rows[indexRow].fields[indexField])) {
+    //           // All fields from row was removed -> remove empty row
+    //           updatedFormModel[indexRow].hidden = true;
+    //           // updatedFormModel.splice(indexRow, 1);
+    //           }
+    //         this.hiddenRowsIndex.push(indexRow);
+    //       }
+    //     }
+    //   });
+    // });
     this.isUpdating = true;
     this.formModel = null;
     this.cdr.detectChanges();
-    this.formModel = updatedFormModel;
+    this.initForm(this.sectionData);
+    // this.formModel = updatedFormModel;
+    if (isNotEmpty(this.sectionData.errorsToShow)) {
+      this.checksForErrors(this.sectionData.errorsToShow);
+    }
     this.isUpdating = false;
     this.cdr.detectChanges();
   }
@@ -406,16 +410,8 @@ export class SubmissionSectionFormComponent extends SectionModelComponent {
    * @param currentRow row from the formConfig with the only one type-bind field
    */
   isTypeBindFieldRendered(indexRow, indexField, currentRow) {
-    let group = null;
-    if (isNotNull(this.formModel[indexRow])) {
-      if (this.formModel[indexRow] instanceof DynamicRowArrayModel) {
-        // @ts-ignore
-        group = this.formModel[indexRow].groups[0].group;
-      } else if (this.formModel[indexRow] instanceof DynamicRowGroupModel) {
-        // @ts-ignore
-        group = this.formModel[indexRow].group;
-      }
-    }
+    const group = this.formBuilderService.getGroup(this.formModel[indexRow]);
+
     if (isNotEmpty(currentRow.selectableMetadata) && isNotNull(group)) {
       if (currentRow.selectableMetadata[0].metadata === group[indexField].name &&
         this.formModel[indexRow].hidden === false) {
@@ -431,6 +427,7 @@ export class SubmissionSectionFormComponent extends SectionModelComponent {
    * @param formConfig configuration of the form, it is loaded from the server.
    */
   updateFormBaseOnTypeBind(event, formConfig) {
+    const oldFormModel = cloneDeep(this.formModel);
     formConfig.rows.forEach((currentRow, indexRow) => {
       let isTypeBindInRow = false;
       currentRow.fields.forEach((field,indexField) => {
@@ -443,18 +440,17 @@ export class SubmissionSectionFormComponent extends SectionModelComponent {
       });
       if (isTypeBindInRow) {
         const parsedRow = this.formBuilderService.parseFormRow(this.submissionId, currentRow, this.collectionId, this.sectionData.data, this.submissionService.getSubmissionScope());
-        const oldFormModel = cloneDeep(this.formModel);
-        this.isUpdating = true;
-        this.formModel = null;
-        this.cdr.detectChanges();
-        this.formModel = oldFormModel;
         if (isNotNull(parsedRow)) {
           // show type-bind row
           if (this.hiddenRowsIndex.includes(indexRow)) {
             parsedRow.hidden = false;
           }
-          this.formModel[indexRow] = parsedRow;
+          oldFormModel[indexRow] = parsedRow;
         }
+        this.isUpdating = true;
+        this.formModel = null;
+        this.cdr.detectChanges();
+        this.formModel = oldFormModel;
         this.isUpdating = false;
         this.cdr.detectChanges();
       }
@@ -469,11 +465,6 @@ export class SubmissionSectionFormComponent extends SectionModelComponent {
    *    the [[DynamicFormControlEvent]] emitted
    */
   onChange(event: DynamicFormControlEvent): void {
-    if (event.model.name === 'dc.type') {
-      const rawData = typeof this.formConfig === 'string' ? JSON.parse(this.formConfig, parseReviver) : this.formConfig;
-      this.initFormWithValues(rawData);
-      this.updateFormBaseOnTypeBind(event, rawData);
-    }
     this.formOperationsService.dispatchOperationsFromEvent(
       this.pathCombiner,
       event,
@@ -484,6 +475,11 @@ export class SubmissionSectionFormComponent extends SectionModelComponent {
 
     if ((environment.submission.autosave.metadata.indexOf(metadata) !== -1 && isNotEmpty(value)) || this.hasRelatedCustomError(metadata)) {
       this.submissionService.dispatchSave(this.submissionId);
+    }
+    if (event.model.name === 'dc.type') {
+      const rawData = typeof this.formConfig === 'string' ? JSON.parse(this.formConfig, parseReviver) : this.formConfig;
+      this.initFormWithValues(value);
+      this.updateFormBaseOnTypeBind(event, rawData);
     }
   }
 

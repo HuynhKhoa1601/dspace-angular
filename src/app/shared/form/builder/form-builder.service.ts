@@ -33,6 +33,7 @@ import { DYNAMIC_FORM_CONTROL_TYPE_RELATION_GROUP } from './ds-dynamic-form-ui/d
 import { CONCAT_GROUP_SUFFIX, DynamicConcatModel } from './ds-dynamic-form-ui/models/ds-dynamic-concat.model';
 import { VIRTUAL_METADATA_PREFIX } from '../../../core/shared/metadata.models';
 import { cloneDeep } from 'lodash';
+import {DynamicRowGroupModel} from './ds-dynamic-form-ui/models/ds-dynamic-row-group-model';
 
 @Injectable()
 export class FormBuilderService extends DynamicFormService {
@@ -258,6 +259,29 @@ export class FormBuilderService extends DynamicFormService {
     return rows;
   }
 
+  getGroup(parsedRow) {
+    if (isNotNull(parsedRow)) {
+      if (parsedRow instanceof DynamicRowArrayModel) {
+        // @ts-ignore
+        return parsedRow.groups[0].group;
+      } else if (parsedRow instanceof DynamicRowGroupModel) {
+        // @ts-ignore
+        return parsedRow.group;
+      }
+    }
+    return null;
+  }
+
+  isFilledOut(rowParsed, sectionData) {
+    let metadataKey = '';
+    if (rowParsed instanceof DynamicRowArrayModel || rowParsed instanceof DynamicRowGroupModel) {
+      metadataKey = rowParsed.metadataKey;
+    } else {
+      metadataKey = rowParsed.selectableMetadata[0].metadata;
+    }
+    return Object.keys(sectionData).includes(metadataKey);
+  }
+
   isModelInCustomGroup(model: DynamicFormControlModel): boolean {
     return this.isCustomGroup((model as any).parent);
   }
@@ -425,7 +449,13 @@ export class FormBuilderService extends DynamicFormService {
    */
   removeFieldFromRow(currentRow, index) {
     const copy = cloneDeep(currentRow);
-    copy.fields.splice(index,1);
+    if (currentRow instanceof DynamicRowArrayModel) {
+      copy.groups.splice(index,1);
+    } else if (currentRow instanceof DynamicRowGroupModel) {
+      copy.group.splice(index,1);
+    } else {
+      copy.fields.splice(index,1);
+    }
     return copy;
   }
 

@@ -8,7 +8,7 @@ import { SortDirection, SortOptions } from '../cache/models/sort-options.model';
 import { FindListOptions } from '../data/request.models';
 import { hasValue, isEmpty, isNotEmpty } from '../../shared/empty.util';
 import { difference } from '../../shared/object.util';
-import { isNumeric } from 'rxjs/internal-compatibility';
+import { isNumeric } from 'src/app/shared/numeric.util';
 
 @Injectable({
   providedIn: 'root',

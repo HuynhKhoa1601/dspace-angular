@@ -17,7 +17,6 @@
         "build": {
           "builder": "@angular-builders/custom-webpack:browser",
           "options": {
-            "extractCss": true,
             "preserveSymlinks": true,
             "customWebpackConfig": {
               "path": "./webpack/webpack.browser.ts",
@@ -26,7 +25,6 @@
               }
             },
             "allowedCommonJsDependencies": [
-              "angular2-text-mask",
               "cerialize",
               "core-js",
               "lodash",
@@ -70,7 +68,8 @@
               "src/license-selector.js",
               "src/license-selector-creation.js",
               "node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"
-            ]
+            ],
+            "baseHref": "/"
           },
           "configurations": {
             "development": {
@@ -90,7 +89,6 @@
               ],
               "optimization": true,
               "outputHashing": "all",
-              "extractCss": true,
               "namedChunks": false,
               "aot": true,
               "extractLicenses": true,

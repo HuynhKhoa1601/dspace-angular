@@ -82,7 +82,6 @@
     "@types/grecaptcha": "^3.0.4",
     "@nth-cloud/ng-toggle": "7.0.0",
     "angular-idle-preload": "3.0.0",
-    "angular2-text-mask": "9.0.0",
     "angulartics2": "^12.0.0",
     "axios": "^0.27.2",
     "bootstrap": "^4.6.1",

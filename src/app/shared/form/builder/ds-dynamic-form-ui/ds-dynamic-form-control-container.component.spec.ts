@@ -5,7 +5,6 @@ import { BrowserDynamicTestingModule } from '@angular/platform-browser-dynamic/t
 import { By } from '@angular/platform-browser';
 
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
-import { TextMaskModule } from 'angular2-text-mask';
 import {
   DynamicCheckboxGroupModel,
   DynamicCheckboxModel,
@@ -208,7 +207,6 @@ describe('DsDynamicFormControlContainerComponent test suite', () => {
         DynamicFormsCoreModule.forRoot(),
         SharedModule,
         TranslateModule.forRoot(),
-        TextMaskModule,
       ],
       providers: [
         DsDynamicFormControlContainerComponent,

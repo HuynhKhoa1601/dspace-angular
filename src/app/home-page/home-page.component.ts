@@ -4,6 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Observable } from 'rxjs';
 import { Site } from '../core/shared/site.model';
 import { environment } from '../../environments/environment';
+import { FastSearchLink } from '../shared/search/models/fast-search-link.model';
 @Component({
   selector: 'ds-home-page',
   styleUrls: ['./home-page.component.scss'],
@@ -106,8 +107,8 @@ export class HomePageComponent implements OnInit {
  * Object for redirecting to the `authors/subjects/languages`
  */
 // tslint:disable-next-line:max-classes-per-file
-class FastSearchLink {
-  name: string;
-  occurrences: string;
-  url: string;
-}
+// class FastSearchLink {
+//   name: string;
+//   occurrences: string;
+//   url: string;
+// }

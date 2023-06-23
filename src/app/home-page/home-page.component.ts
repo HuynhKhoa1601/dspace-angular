@@ -4,6 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Observable } from 'rxjs';
 import { Site } from '../core/shared/site.model';
 import { environment } from '../../environments/environment';
+import { FastSearchLink } from '../shared/search/models/fast-search-link.model';
 @Component({
   selector: 'ds-home-page',
   styleUrls: ['./home-page.component.scss'],

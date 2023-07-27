@@ -48,12 +48,15 @@ import { ChartsModule } from 'ng2-charts';
 import { ClarinGenericItemFieldComponent } from './simple/field-components/clarin-generic-item-field/clarin-generic-item-field.component';
 import { ClarinCollectionsItemFieldComponent } from './simple/field-components/clarin-collections-item-field/clarin-collections-item-field.component';
 import { ClarinFilesItemFieldComponent } from './simple/field-components/clarin-files-item-field/clarin-files-item-field.component';
-
+import { FileDescriptionComponent } from './simple/field-components/preview-section/file-description/file-description.component';
+import { FileTreeViewComponent } from './simple/field-components/preview-section/file-description/file-tree-view/file-tree-view.component';
+import { PreviewSectionComponent } from './simple/field-components/preview-section/preview-section.component';
+import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 
 const ENTRY_COMPONENTS = [
   // put only entry components that use custom decorator
   PublicationComponent,
-  UntypedItemComponent
+  UntypedItemComponent,
 ];
 
 const DECLARATIONS = [
@@ -93,7 +96,10 @@ const DECLARATIONS = [
   ClarinStatisticsButtonComponent,
   ClarinGenericItemFieldComponent,
   ClarinCollectionsItemFieldComponent,
-  ClarinFilesItemFieldComponent
+  ClarinFilesItemFieldComponent,
+  PreviewSectionComponent,
+  FileDescriptionComponent,
+  FileTreeViewComponent,
 ];
 
 @NgModule({
@@ -106,15 +112,11 @@ const DECLARATIONS = [
     JournalEntitiesModule.withEntryComponents(),
     ResearchEntitiesModule.withEntryComponents(),
     NgxGalleryModule,
-    ChartsModule
+    ChartsModule,
+    NgbModule
   ],
-  declarations: [
-    ...DECLARATIONS,
-    VersionedItemComponent
-  ],
-    exports: [
-        ...DECLARATIONS
-    ]
+  declarations: [...DECLARATIONS, VersionedItemComponent],
+  exports: [...DECLARATIONS],
 })
 export class ItemPageModule {
   /**
@@ -124,8 +126,7 @@ export class ItemPageModule {
   static withEntryComponents() {
     return {
       ngModule: ItemPageModule,
-      providers: ENTRY_COMPONENTS.map((component) => ({provide: component}))
+      providers: ENTRY_COMPONENTS.map((component) => ({ provide: component })),
     };
   }
-
 }
